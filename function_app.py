@@ -18,7 +18,7 @@ def get_google_response(workflow_code, error_details):
     
     messages = [
         {
-            "text": f"Based on the following workflow code and errors, provide updated code:\n\nWorkflow Code: {json.dumps(workflow_code)}\nErrors: {json.dumps(error_details)}"
+            "text": f"Based on the following workflow code and errors, provide updated code:\n\nWorkflow Code: {json.dumps(workflow_code)}\nErrors: {json.dumps(error_details)} without code explaination. just raw updated code"
         }
     ]
 
