@@ -1,4 +1,4 @@
-import azure.functions as func 
+import azure.functions as func
 import logging
 import requests
 import json
@@ -7,7 +7,7 @@ import concurrent.futures
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 API_VERSION = "2016-06-01"
-GOOGLE_API_KEY = "AIzaSyCSUcI9ZlnwiswT4LQFL6uwTeJpTUXmG0g"  # Update with your API key
+GOOGLE_API_KEY = "AIzaSyCSUcI9ZlnwiswT4LQFL6uwTeJpTUXmG0g"
 
 def handle_error(message, status_code=500):
     logging.error(message)
@@ -18,7 +18,7 @@ def get_google_response(workflow_code, error_details):
     
     messages = [
         {
-            "text": f"Based on the following workflow code and errors, provide updated code:\n\nWorkflow Code: {json.dumps(workflow_code)}\nErrors: {json.dumps(error_details)} without code explaination. just raw updated code"
+            "text": f"Based on the following workflow code and errors, provide updated code:\n\nWorkflow Code: {json.dumps(workflow_code)}\nErrors: {json.dumps(error_details)} without code explanation. Just raw updated code."
         }
     ]
 
@@ -28,18 +28,10 @@ def get_google_response(workflow_code, error_details):
 
     response = requests.post(url, headers={"Content-Type": "application/json"}, json=data)
     
-    # Log the full response for debugging
-    logging.info(f"Google API response: {response.status_code} - {response.text}")
-
     if response.status_code == 200:
-        # Extract only the updated code without explanations
         candidates = response.json().get('candidates', [])
         if candidates:
-            return {
-                "updatedcode": {
-                    "text": candidates[0].get('content', {}).get('parts', [{}])[0].get('text', "")
-                }
-            }
+            return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', "")
     else:
         logging.error(f"Google API request failed: {response.status_code} - {response.text}")
         return None
@@ -52,7 +44,6 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
     if not bearer_token or not bearer_token.startswith('Bearer '):
         return handle_error("Invalid or missing Authorization token.", 400)
 
-    # Extract parameters from request body
     try:
         req_body = req.get_json()
         subscription_id = req_body.get('subscription_id')
@@ -117,6 +108,7 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
                             if error_message not in seen_error_messages:
                                 seen_error_messages.add(error_message)
                                 error_detail = {
+                                    "run-id": run_id,
                                     "properties": {
                                         "status": action_properties.get("status"),
                                         "code": action_properties.get("code"),
@@ -128,7 +120,7 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
                                 workflow_error.append(error_detail)
 
                     if workflow_error:
-                        failed_run_actions.append({run_id: {"workflow-error": workflow_error}})
+                        failed_run_actions.extend(workflow_error)
 
                 except requests.exceptions.RequestException as e:
                     logging.error(f"API call to get actions for run ID {run_id} failed: {str(e)}")
@@ -153,8 +145,9 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
 
     return func.HttpResponse(
         json.dumps({
-            "failed_run_actions": failed_run_actions,
-            "google_response": updated_code
+            "workflow-error": failed_run_actions,
+            "workflow-code": workflow_code,
+            "workflow-updated-code": updated_code
         }),
         status_code=200,
         mimetype="application/json"
